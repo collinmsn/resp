@@ -1,40 +1,40 @@
 package resp
 
 import (
+	"bufio"
 	"bytes"
 	"testing"
 )
 
 var (
-	respSimpleString = Data{T:T_SimpleString, String:[]byte("OK")}
+	respSimpleString     = Data{T: T_SimpleString, String: []byte("OK")}
 	respSimpleStringText = "+OK\r\n"
 
-	respError = Data{T:T_Error, String:[]byte("Error message")}
+	respError     = Data{T: T_Error, String: []byte("Error message")}
 	respErrorText = "-Error message\r\n"
 
-	respBulkString = Data{T:T_BulkString, String:[]byte("foobar")}
+	respBulkString     = Data{T: T_BulkString, String: []byte("foobar")}
 	respBulkStringText = "$6\r\nfoobar\r\n"
 
-	respNilBulkString = Data{T:T_BulkString, IsNil:true}
+	respNilBulkString     = Data{T: T_BulkString, IsNil: true}
 	respNilBulkStringText = "$-1\r\n"
 
-	respInteger = Data{T:T_Integer, Integer:1000}
+	respInteger     = Data{T: T_Integer, Integer: 1000}
 	respIntegerText = ":1000\r\n"
 
-	respArray = Data{T:T_Array, Array:[]*Data{&respSimpleString, &respInteger}}
+	respArray     = Data{T: T_Array, Array: []*Data{&respSimpleString, &respInteger}}
 	respArrayText = "*2\r\n" + respSimpleStringText + respIntegerText
 )
-
 
 var validCommand map[string]string
 var validData map[string]Data
 
 func TestValidData(t *testing.T) {
 	for text, data := range validData {
-		buf := bytes.NewReader([]byte(text))
+		buf := bufio.NewReader(bytes.NewReader([]byte(text)))
 		//test read
 		d, err := ReadData(buf)
-		if nil!=err || d.T != data.T {
+		if nil != err || d.T != data.T {
 			t.Error(err, text, data.T)
 		}
 
@@ -50,7 +50,7 @@ func TestValidData(t *testing.T) {
 }
 
 func BenchmarkDataFormat(b *testing.B) {
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		for _, data := range validData {
 			data.Format()
 		}
@@ -58,19 +58,17 @@ func BenchmarkDataFormat(b *testing.B) {
 }
 
 func BenchmarkReadData(b *testing.B) {
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		for text, _ := range validData {
-			buf := bytes.NewReader([]byte(text))
+			buf := bufio.NewReader(bytes.NewReader([]byte(text)))
 			ReadData(buf)
 		}
 	}
 }
 
-
-
 func eqData(d1, d2 Data) bool {
 	eqType := d1.T == d2.T
-	eqString := 0==bytes.Compare(d1.String, d2.String)
+	eqString := 0 == bytes.Compare(d1.String, d2.String)
 	eqInteger := d1.Integer == d2.Integer
 	eqNil := d1.IsNil == d2.IsNil
 	eqArrayLen := len(d1.Array) == len(d2.Array)
@@ -88,7 +86,7 @@ func eqData(d1, d2 Data) bool {
 
 func TestValidCommand(t *testing.T) {
 	for input, cmd := range validCommand {
-		reader := bytes.NewReader([]byte(input))
+		reader := bufio.NewReader(bytes.NewReader([]byte(input)))
 		c, err := ReadCommand(reader)
 		if nil != err {
 			t.Error("read command error", err)
@@ -100,7 +98,7 @@ func TestValidCommand(t *testing.T) {
 
 func _validCommand(tb testing.TB) {
 	for input, cmd := range validCommand {
-		reader := bytes.NewReader([]byte(input))
+		reader := bufio.NewReader(bytes.NewReader([]byte(input)))
 		c, err := ReadCommand(reader)
 		if nil != err {
 			tb.Error("read command error", err)
@@ -112,7 +110,7 @@ func _validCommand(tb testing.TB) {
 }
 
 func BenchmarkValidCommand(b *testing.B) {
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		_validCommand(b)
 	}
 }
@@ -127,26 +125,26 @@ func testCommandFormat(t *testing.T) {
 
 func BenchmarkCommandFormat(b *testing.B) {
 	cmd, _ := NewCommand("LLEN", "walu.cc")
-	for i:=0; i< b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		cmd.Format()
 	}
 }
 
 func init() {
 	validCommand = map[string]string{
-		"PING" : "PING",
-		"PING\n" : "PING",
-		"PING\r" : "PING",
+		"PING":    "PING",
+		"PING\n":  "PING",
+		"PING\r":  "PING",
 		"  PING ": "PING",
-		"*2\r\n$4\r\nLLEN\r\n$6\r\nmysist\r\n" : "LLEN",
+		"*2\r\n$4\r\nLLEN\r\n$6\r\nmysist\r\n": "LLEN",
 	}
 
-	validData = map[string]Data {
-		respSimpleStringText : respSimpleString,
-		respErrorText : respError,
-		respBulkStringText : respBulkString,
-		respNilBulkStringText : respNilBulkString,
-		respIntegerText : respInteger,
-		respArrayText : respArray,
+	validData = map[string]Data{
+		respSimpleStringText:  respSimpleString,
+		respErrorText:         respError,
+		respBulkStringText:    respBulkString,
+		respNilBulkStringText: respNilBulkString,
+		respIntegerText:       respInteger,
+		respArrayText:         respArray,
 	}
 }

@@ -2,19 +2,20 @@
 package resp
 
 import (
-	"io"
-	"errors"
+	"bufio"
 	"bytes"
+	"errors"
+	"io"
 	"strconv"
 	"strings"
 )
 
 const (
-	T_SimpleString	= '+'
-	T_Error		= '-'
-	T_Integer	= ':'
-	T_BulkString	= '$'
-	T_Array		= '*'
+	T_SimpleString = '+'
+	T_Error        = '-'
+	T_Integer      = ':'
+	T_BulkString   = '$'
+	T_Array        = '*'
 )
 
 var CRLF = []byte{'\r', '\n'}
@@ -30,7 +31,7 @@ type Command struct {
 
 //get the command name
 func (c Command) Name() string {
-	if len(c.Args)==0 {
+	if len(c.Args) == 0 {
 		return ""
 	} else {
 		return c.Args[0]
@@ -47,7 +48,7 @@ func (c Command) Value(index int) (ret string) {
 	return ret
 }
 
-//get command.Args[index] in int64. 
+//get command.Args[index] in int64.
 //return 0 if it isn't numberic string.
 func (c Command) Integer(index int) (ret int64) {
 	if len(c.Args) > index {
@@ -83,18 +84,18 @@ func NewCommand(args ...string) (*Command, error) {
 	if len(args) == 0 {
 		return nil, errors.New("err_new_cmd")
 	}
-	return &Command{Args:args}, nil
+	return &Command{Args: args}, nil
 }
 
 //read a command from io.reader
-func ReadCommand(r io.Reader) (*Command, error) {
+func ReadCommand(r *bufio.Reader) (*Command, error) {
 	buf, err := readRespCommandLine(r)
-	if nil != err && !(io.EOF == err && len(buf) > 1 ) {
+	if nil != err && !(io.EOF == err && len(buf) > 1) {
 		return nil, err
 	}
 
 	if T_Array != buf[0] {
-		return NewCommand(strings.Fields( strings.TrimSpace(string(buf)) )...)
+		return NewCommand(strings.Fields(strings.TrimSpace(string(buf)))...)
 	}
 
 	//Command: BulkString
@@ -119,11 +120,11 @@ func ReadCommand(r io.Reader) (*Command, error) {
 
 //a resp package
 type Data struct {
-	T byte
-	String []byte
+	T       byte
+	String  []byte
 	Integer int64
-	Array []*Data
-	IsNil bool
+	Array   []*Data
+	IsNil   bool
 }
 
 //format Data into resp string
@@ -139,29 +140,29 @@ func (d Data) Format() []byte {
 	}
 
 	switch d.T {
-		case T_SimpleString, T_Error:
-			ret.Write(d.String)
-			ret.Write(CRLF)
-		case T_BulkString:
-			ret.WriteString(strconv.Itoa(len(d.String)))
-			ret.Write(CRLF)
-			ret.Write(d.String)
-			ret.Write(CRLF)
-		case T_Integer:
-			ret.WriteString(strconv.FormatInt(d.Integer, 10))
-			ret.Write(CRLF)
-		case T_Array:
-			ret.WriteString(strconv.Itoa(len(d.Array)))
-			ret.Write(CRLF)
-			for index := range d.Array {
-				ret.Write(d.Array[index].Format())
-			}
+	case T_SimpleString, T_Error:
+		ret.Write(d.String)
+		ret.Write(CRLF)
+	case T_BulkString:
+		ret.WriteString(strconv.Itoa(len(d.String)))
+		ret.Write(CRLF)
+		ret.Write(d.String)
+		ret.Write(CRLF)
+	case T_Integer:
+		ret.WriteString(strconv.FormatInt(d.Integer, 10))
+		ret.Write(CRLF)
+	case T_Array:
+		ret.WriteString(strconv.Itoa(len(d.Array)))
+		ret.Write(CRLF)
+		for index := range d.Array {
+			ret.Write(d.Array[index].Format())
+		}
 	}
 	return ret.Bytes()
 }
 
 //get a data from io.Reader
-func ReadData(r io.Reader) (*Data, error) {
+func ReadData(r *bufio.Reader) (*Data, error) {
 	buf, err := readRespLine(r)
 	if nil != err {
 		return nil, err
@@ -174,137 +175,94 @@ func ReadData(r io.Reader) (*Data, error) {
 	return readDataForSpecType(r, buf)
 }
 
-func readDataForSpecType(r io.Reader, line []byte) (*Data, error) {
+func readDataForSpecType(r *bufio.Reader, line []byte) (*Data, error) {
 
 	var err error
 	var ret *Data
 
 	ret = new(Data)
 	switch line[0] {
-		case T_SimpleString:
-			ret.T = T_SimpleString
-			ret.String = line[1:]
+	case T_SimpleString:
+		ret.T = T_SimpleString
+		ret.String = line[1:]
 
-		case T_Error:
-			ret.T = T_Error
-			ret.String = line[1:]
+	case T_Error:
+		ret.T = T_Error
+		ret.String = line[1:]
 
-		case T_Integer:
-			ret.T = T_Integer
-			ret.Integer, err = strconv.ParseInt(string(line[1:]), 10, 64)
+	case T_Integer:
+		ret.T = T_Integer
+		ret.Integer, err = strconv.ParseInt(string(line[1:]), 10, 64)
 
-		case T_BulkString:
-			var lenBulkString int64
-			lenBulkString, err = strconv.ParseInt(string(line[1:]), 10, 64)
+	case T_BulkString:
+		var lenBulkString int64
+		lenBulkString, err = strconv.ParseInt(string(line[1:]), 10, 64)
 
-			ret.T = T_BulkString
-			if -1 != lenBulkString {
-				ret.String, err = readRespN(r, lenBulkString)
-				_, err = readRespN(r, 2)
+		ret.T = T_BulkString
+		if -1 != lenBulkString {
+			ret.String, err = readRespN(r, lenBulkString)
+			_, err = readRespN(r, 2)
+		} else {
+			ret.IsNil = true
+		}
+
+	case T_Array:
+		var lenArray int64
+		var i int64
+		lenArray, err = strconv.ParseInt(string(line[1:]), 10, 64)
+
+		ret.T = T_Array
+		if nil == err {
+			if -1 != lenArray {
+				ret.Array = make([]*Data, lenArray)
+				for i = 0; i < lenArray && nil == err; i++ {
+					ret.Array[i], err = ReadData(r)
+				}
 			} else {
 				ret.IsNil = true
 			}
+		}
 
-		case T_Array:
-			var lenArray int64
-			var i int64
-			lenArray, err = strconv.ParseInt(string(line[1:]), 10, 64)
-
-			ret.T = T_Array
-			if nil==err {
-				if -1 != lenArray {
-					ret.Array = make([]*Data, lenArray)
-					for i=0; i<lenArray && nil == err; i++ {
-						ret.Array[i], err = ReadData(r)
-					}
-				} else {
-					ret.IsNil = true
-				}
-			}
-
-		default: //Maybe you are Inline Command
-			err = errors.New("Unexpected type ")
+	default: //Maybe you are Inline Command
+		err = errors.New("Unexpected type ")
 
 	}
 	return ret, err
 }
 
-
-
-
 //read a resp line and trim the last \r\n
-func readRespLine(r io.Reader) ([]byte, error) {
-
-	var i int
-	var err error
-	var buf []byte
-	var ret *bytes.Buffer
-
-	buf = make([]byte, 1)
-	ret = &bytes.Buffer{}
-
-	for {
-		_, err = io.ReadFull(r, buf)
-		if nil != err {
-			return nil, err
-		}
-
-		i++
-		ret.WriteByte(buf[0])
-		if '\n' == buf[0] {
-			break
-		}
+func readRespLine(r *bufio.Reader) ([]byte, error) {
+	line, err := r.ReadBytes('\n')
+	if err != nil {
+		return nil, err
 	}
-
-	return ret.Next(i-2), nil
+	return line[:len(line)-2], nil
 }
 
 //read a redis InlineCommand
-func readRespCommandLine(r io.Reader) ([]byte, error) {
-
-	var err error
-	var buf []byte
-	var ret *bytes.Buffer
-
-	buf = make([]byte, 1)
-	ret = &bytes.Buffer{}
-
-	for {
-		_, err = io.ReadFull(r, buf)
-		if nil != err {
-			if io.EOF == err {
-				break
-			}
-			return nil, err
-		}
-
-		ret.WriteByte(buf[0])
-		if '\n' == buf[0] {
-			break
-		}
+func readRespCommandLine(r *bufio.Reader) ([]byte, error) {
+	line, err := r.ReadBytes('\n')
+	if err != nil && err != io.EOF {
+		return nil, err
 	}
 
-	return bytes.TrimSpace(ret.Bytes()), err
+	return bytes.TrimSpace(line), err
 }
 
-
 //read the next N bytes
-func readRespN(r io.Reader, n int64) ([]byte, error) {
-	var err error
-	var ret []byte
-
-	ret = make([]byte, n)
-	_, err = io.ReadFull(r, ret)
-	if nil!=err {
-		ret = nil
+func readRespN(r *bufio.Reader, n int64) ([]byte, error) {
+	buf := make([]byte, n)
+	if _, err := r.Read(buf); err != nil {
+		return nil, err
+	} else {
+		return buf, nil
 	}
-	return ret, err
 }
 
 //read a respline, and return the values parsed into int
-func readRespIntLine(r io.Reader) (int64, error) {
+func readRespIntLine(r *bufio.Reader) (int64, error) {
 	line, err := readRespLine(r)
-	if nil!=err {
+	if nil != err {
 		return 0, err
 	}
 	return strconv.ParseInt(string(line), 10, 64)
