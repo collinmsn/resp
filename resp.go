@@ -87,7 +87,7 @@ func NewCommand(args ...string) (*Command, error) {
 	return &Command{Args: args}, nil
 }
 
-//read a command from io.reader
+//read a command from bufio.Reader
 func ReadCommand(r *bufio.Reader) (*Command, error) {
 	buf, err := readRespCommandLine(r)
 	if nil != err && !(io.EOF == err && len(buf) > 1) {
@@ -161,7 +161,7 @@ func (d Data) Format() []byte {
 	return ret.Bytes()
 }
 
-//get a data from io.Reader
+//get a data from bufio.Reader
 func ReadData(r *bufio.Reader) (*Data, error) {
 	buf, err := readRespLine(r)
 	if nil != err {

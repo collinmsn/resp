@@ -60,7 +60,9 @@ func BenchmarkDataFormat(b *testing.B) {
 func BenchmarkReadData(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for text, _ := range validData {
+			b.StopTimer()
 			buf := bufio.NewReader(bytes.NewReader([]byte(text)))
+			b.StartTimer()
 			ReadData(buf)
 		}
 	}
@@ -96,17 +98,18 @@ func TestValidCommand(t *testing.T) {
 	}
 }
 
-func _validCommand(tb testing.TB) {
+func _validCommand(b *testing.B) {
 	for input, cmd := range validCommand {
+		b.StopTimer()
 		reader := bufio.NewReader(bytes.NewReader([]byte(input)))
+		b.StartTimer()
 		c, err := ReadCommand(reader)
 		if nil != err {
-			tb.Error("read command error", err)
+			b.Error("read command error", err)
 		} else if c.Name() != cmd {
-			tb.Error("read command error", c.Name(), cmd)
+			b.Error("read command error", c.Name(), cmd)
 		}
 	}
-
 }
 
 func BenchmarkValidCommand(b *testing.B) {
@@ -132,10 +135,8 @@ func BenchmarkCommandFormat(b *testing.B) {
 
 func init() {
 	validCommand = map[string]string{
-		"PING":    "PING",
-		"PING\n":  "PING",
-		"PING\r":  "PING",
-		"  PING ": "PING",
+		"PING\r\n":                             "PING",
+		"EXISTS foo\r\n":                       "EXISTS",
 		"*2\r\n$4\r\nLLEN\r\n$6\r\nmysist\r\n": "LLEN",
 	}
 
