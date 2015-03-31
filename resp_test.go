@@ -3,6 +3,8 @@ package resp
 import (
 	"bufio"
 	"bytes"
+	"fmt"
+	"io"
 	"testing"
 )
 
@@ -95,6 +97,39 @@ func TestValidCommand(t *testing.T) {
 		} else if c.Name() != cmd {
 			t.Error("read command error", c.Name(), cmd)
 		}
+	}
+}
+
+func TestWriteRead(t *testing.T) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+	count := 1000
+	for i := 0; i < count; i++ {
+		cmd, err := NewCommand("SET", fmt.Sprintf("%d", i), fmt.Sprintf("%d", i))
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if _, err := w.Write(cmd.Format()); err != nil {
+			t.Error(err)
+			return
+		}
+	}
+	if err := w.Flush(); err != nil {
+		t.Error(err)
+		return
+	}
+
+	r := bufio.NewReader(&b)
+	for i := 0; i < count; i++ {
+		_, err := ReadCommand(r)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+	if _, err := ReadCommand(r); err != io.EOF {
+		t.Error(err)
 	}
 }
 

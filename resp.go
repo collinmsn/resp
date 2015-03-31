@@ -18,7 +18,10 @@ const (
 	T_Array        = '*'
 )
 
-var CRLF = []byte{'\r', '\n'}
+var (
+	CRLF         = []byte{'\r', '\n'}
+	PROTOCOL_ERR = errors.New("Protocol error")
+)
 
 /*
 Command
@@ -236,23 +239,30 @@ func readRespLine(r *bufio.Reader) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return line[:len(line)-2], nil
+	if n := len(line); n < 2 {
+		return nil, PROTOCOL_ERR
+	} else {
+		return line[:n-2], nil
+	}
 }
 
 //read a redis InlineCommand
 func readRespCommandLine(r *bufio.Reader) ([]byte, error) {
 	line, err := r.ReadBytes('\n')
-	if err != nil && err != io.EOF {
+	if err != nil {
 		return nil, err
 	}
-
-	return bytes.TrimSpace(line), err
+	if n := len(line); n < 2 {
+		return nil, PROTOCOL_ERR
+	} else {
+		return line[:n-2], nil
+	}
 }
 
 //read the next N bytes
 func readRespN(r *bufio.Reader, n int64) ([]byte, error) {
 	buf := make([]byte, n)
-	if _, err := r.Read(buf); err != nil {
+	if _, err := io.ReadFull(r, buf); err != nil {
 		return nil, err
 	} else {
 		return buf, nil
