@@ -70,6 +70,17 @@ func BenchmarkReadData(b *testing.B) {
 	}
 }
 
+func BenchmarkReadDataBytes(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for text, _ := range validData {
+			b.StopTimer()
+			buf := bufio.NewReader(bytes.NewReader([]byte(text)))
+			b.StartTimer()
+			o := NewObject()
+			ReadDataBytes(buf, o)
+		}
+	}
+}
 func eqData(d1, d2 Data) bool {
 	eqType := d1.T == d2.T
 	eqString := 0 == bytes.Compare(d1.String, d2.String)
@@ -130,6 +141,27 @@ func TestWriteRead(t *testing.T) {
 	}
 	if _, err := ReadCommand(r); err != io.EOF {
 		t.Error(err)
+	}
+}
+
+func TestReadDataBytes(t *testing.T) {
+	cases := []string{
+		"-MOVED 135 127.0.0.1:7003\r\n",
+		"*2\r\n$3\r\nget\r\n$3\r\naaa\r\n",
+		"$3\r\nbbb\r\n",
+	}
+	for _, cc := range cases {
+		r := bufio.NewReader(bytes.NewBufferString(cc))
+		o := NewObject()
+		if err := ReadDataBytes(r, o); err != nil {
+			t.Error(err)
+		}
+		if !bytes.Equal(o.Raw(), []byte(cc)) {
+			t.Errorf("expected: %s, got: %s", cc, o.Raw())
+		}
+		if _, err := r.Peek(1); err != io.EOF {
+			t.Errorf("expected EOFs, got: %s", err)
+		}
 	}
 }
 

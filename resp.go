@@ -233,6 +233,48 @@ func readDataForSpecType(r *bufio.Reader, line []byte) (*Data, error) {
 	return ret, err
 }
 
+//
+func readDataBytesForSpecType(r *bufio.Reader, line []byte, obj *Object) error {
+	switch line[0] {
+	case T_SimpleString, T_Error, T_Integer:
+		return nil
+	case T_BulkString:
+		lenBulkString, err := strconv.ParseInt(string(line[1:]), 10, 64)
+		if err != nil {
+			return err
+		}
+		if lenBulkString != -1 {
+			buf, err := readRespN(r, lenBulkString+2)
+			if err != nil {
+				return err
+			} else {
+				obj.Append(buf)
+			}
+		}
+		// else if nil
+
+	case T_Array:
+		lenArray, err := strconv.ParseInt(string(line[1:]), 10, 64)
+		if err != nil {
+			return err
+		}
+		var i int64
+		if lenArray != -1 {
+			for i = 0; i < lenArray; i++ {
+				if err := ReadDataBytes(r, obj); err != nil {
+					return err
+				}
+			}
+		}
+		// else is nil
+
+	default:
+		return errors.New("Unexpected type ")
+
+	}
+	return nil
+}
+
 //read a resp line and trim the last \r\n
 func readRespLine(r *bufio.Reader) ([]byte, error) {
 	line, err := r.ReadBytes('\n')
@@ -242,6 +284,20 @@ func readRespLine(r *bufio.Reader) ([]byte, error) {
 	if n := len(line); n < 2 {
 		return nil, PROTOCOL_ERR
 	} else {
+		return line[:n-2], nil
+	}
+}
+
+//
+func readRespLineBytes(r *bufio.Reader, obj *Object) ([]byte, error) {
+	line, err := r.ReadBytes('\n')
+	if err != nil {
+		return nil, err
+	}
+	if n := len(line); n < 2 {
+		return nil, PROTOCOL_ERR
+	} else {
+		obj.Append(line)
 		return line[:n-2], nil
 	}
 }
@@ -269,11 +325,39 @@ func readRespN(r *bufio.Reader, n int64) ([]byte, error) {
 	}
 }
 
-//read a respline, and return the values parsed into int
-func readRespIntLine(r *bufio.Reader) (int64, error) {
-	line, err := readRespLine(r)
-	if nil != err {
-		return 0, err
+type Object struct {
+	raw bytes.Buffer
+}
+
+func NewObject() *Object {
+	o := &Object{}
+	return o
+}
+
+func NewObjectFromData(data *Data) *Object {
+	o := &Object{}
+	o.Append(data.Format())
+	return o
+}
+
+func (o *Object) Append(buf []byte) {
+	o.raw.Write(buf)
+}
+
+func (o *Object) Raw() []byte {
+	return o.raw.Bytes()
+}
+
+// read data bytes reads a full RESP object bytes
+func ReadDataBytes(r *bufio.Reader, obj *Object) error {
+	buf, err := readRespLineBytes(r, obj)
+	if err != nil {
+		return err
 	}
-	return strconv.ParseInt(string(line), 10, 64)
+
+	if len(buf) < 2 {
+		return errors.New("invalid Data Source: " + string(buf))
+	}
+
+	return readDataBytesForSpecType(r, buf, obj)
 }
