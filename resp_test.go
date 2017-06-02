@@ -165,6 +165,13 @@ func TestReadDataBytes(t *testing.T) {
 	}
 }
 
+func TestReadCommand(t *testing.T) {
+	r := bufio.NewReader(bytes.NewBufferString("\r\n"))
+	if _, err := ReadCommand(r); err != nil {
+		t.Log("OK")
+	}
+}
+
 func _validCommand(b *testing.B) {
 	for input, cmd := range validCommand {
 		b.StopTimer()
